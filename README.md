@@ -15,6 +15,7 @@ Aqui eles ficam juntos, num caminho separado do Pocket.
 | Ferramenta | URL | Para quem |
 |---|---|---|
 | **Emissor de Recibos** | `https://humanidade-grupo.github.io/ferramentas/recibos/` | Financeiro do Parque da Saudade |
+| **Contratos D4Sign do mês** (script local, não é página) | pasta [`d4sign-lote/`](d4sign-lote/) | Ricardo, uma vez por mês |
 
 ## Regras
 

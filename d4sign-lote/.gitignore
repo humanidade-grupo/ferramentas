@@ -1,0 +1,7 @@
+# dados ficam fora do repo; isto é só rede de segurança
+perfil/
+downloads/
+*.csv
+*.txt
+*.zip
+__pycache__/

@@ -85,14 +85,18 @@ def fase_base(txt):
 
 
 def levou(fase_txt, cadastro):
-    """'FINALIZADO LEVOU 2 DIAS' -> cadastro + 2 dias (só a data: é aproximação da tela)."""
+    """'FINALIZADO LEVOU 8 HORAS PARA SER FINALIZADO' -> cadastro + 8 h.
+    Aproximação da tela (a D4Sign arredonda para a maior unidade), mas o modal de um
+    documento finalizado não mostra a hora de cada assinatura — é o que há."""
     up = (fase_txt or "").upper()
-    m = re.search(r"LEVOU\s+(\d+)\s+(DIA|HORA|MINUTO|SEGUNDO)", up)
+    m = re.search(r"LEVOU\s+(\d+)\s+(DIA|HORA|MINUTO|SEGUNDO|M[EÊ]S|SEMANA)", up)
     if not m:
-        # "LEVOU MENOS DE 1 DIA" e parecidos: terminou no dia do cadastro
-        return cadastro.strftime("%Y-%m-%d") if "LEVOU" in up else None
-    dias = int(m.group(1)) if m.group(2) == "DIA" else 0
-    return (cadastro + timedelta(days=dias)).strftime("%Y-%m-%d")
+        # "LEVOU MENOS DE 1 ..." e parecidos: terminou no dia do cadastro
+        return cadastro.strftime("%Y-%m-%d %H:%M") if "LEVOU" in up else None
+    n, u = int(m.group(1)), m.group(2)
+    delta = {"DIA": timedelta(days=n), "HORA": timedelta(hours=n), "MINUTO": timedelta(minutes=n),
+             "SEGUNDO": timedelta(seconds=n), "SEMANA": timedelta(weeks=n)}.get(u, timedelta(days=30 * n))
+    return (cadastro + delta).strftime("%Y-%m-%d %H:%M")
 
 
 # ------------------------------------------------------------------ navegador
@@ -152,7 +156,8 @@ def varrer(page, cofre, limite):
             cad = ler_data(l["cadastro_txt"])
             if not cad:
                 raise Aborta(f"cadastro em formato inesperado ({url.split('?')[-1]}): {l['cadastro_txt']!r}")
-            fase_txt = next((c.split("\n")[0] for c in l["celulas"] if fase_base(c)), "")
+            # a célula inteira: "FINALIZADO\n\nLEVOU 8 HORAS PARA SER FINALIZADO" — o tempo vem na 2ª linha
+            fase_txt = next((re.sub(r"\s+", " ", c) for c in l["celulas"] if fase_base(c)), "")
             if not fase_txt:
                 raise Aborta(f"documento {l['uuid']} sem fase reconhecível — a D4Sign mudou a tela?")
             m = next((RX_PCT.search(c) for c in l["celulas"] if RX_PCT.search(c)), None)
@@ -173,15 +178,21 @@ def varrer(page, cofre, limite):
     return docs[:limite] if limite else docs
 
 
+# Sondado em 19/09: o .modal-body tem uma <table> com UMA <tr> por signatário. Quem assinou
+# tem o ícone `fa-check-circle-o color-verde` (pendente: `color-cinza`); o texto ASSINOU só
+# aparece depois de assinado. Sem a tabela, cai no "maior bloco com exatamente um e-mail".
 LER_MODAL = r"""() => {
   const rx = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
   const body = [...document.querySelectorAll('.modal-body')].find(b => /@/.test(b.innerText || ''));
   if (!body) return null;
   const n = el => ((el.innerText || '').match(rx) || []).length;
-  // o "cartão" de cada signatário: o maior elemento que contém exatamente UM e-mail
-  return [...body.querySelectorAll('*')]
-    .filter(el => n(el) === 1 && (el.parentElement === body || n(el.parentElement) !== 1))
-    .map(el => el.innerText);
+  const verde = el => [...el.querySelectorAll('i.fa-check-circle-o, i.fa-check-circle')]
+                        .some(i => /color-verde/.test(i.className));
+  let blocos = [...body.querySelectorAll('table tr')].filter(tr => n(tr) === 1);
+  if (!blocos.length)
+    blocos = [...body.querySelectorAll('*')]
+      .filter(el => n(el) === 1 && (el.parentElement === body || n(el.parentElement) !== 1));
+  return blocos.map(el => ({txt: el.innerText, verde: verde(el)}));
 }"""
 
 FECHAR_MODAL = r"""() => {
@@ -196,15 +207,23 @@ def ler_signatarios(page, uuid):
     """Abre o modal de signatários (o mesmo javascript da tela) e lê o .modal-body."""
     for tentativa in range(3):
         page.evaluate(FECHAR_MODAL)
+        # O fechamento do anterior é animado (bootstrap "fade"): abrir o próximo antes de ele
+        # terminar deixa o modal novo escondido, e o e-mail nunca fica visível (medido em 19/09).
+        time.sleep(1.2)
         page.evaluate(f"eModalO('/desk/listsignatarios/{uuid}','S','fa-users','lg')")
-        try:
-            page.wait_for_function(
-                r"""() => [...document.querySelectorAll('.modal-body')].some(b => /@/.test(b.innerText || ''))""",
-                timeout=20_000)
-        except PWTimeout:
+        # Espera em Python, não com wait_for_function: nesta página ele estoura o prazo
+        # mesmo com o modal pronto em ~1 s (medido em 19/09 — provavelmente a CSP da D4Sign).
+        pronto = False
+        for _ in range(40):
+            time.sleep(0.5)
+            if page.evaluate(r"""() => [...document.querySelectorAll('.modal-body')].some(b => /@/.test(b.innerText || ''))"""):
+                pronto = True
+                break
+        if not pronto:
             if "login" in page.url:
                 raise Aborta("a sessão caiu no meio da leitura dos signatários")
             continue
+        time.sleep(0.5)   # a tabela termina de montar logo depois do primeiro e-mail
         cartoes = page.evaluate(LER_MODAL) or []
         page.evaluate(FECHAR_MODAL)
         sigs = [cartao(c) for c in cartoes]
@@ -214,7 +233,8 @@ def ler_signatarios(page, uuid):
     raise Aborta(f"não consegui ler os signatários de {uuid} depois de 3 tentativas")
 
 
-def cartao(txt):
+def cartao(bloco):
+    txt, verde = bloco["txt"], bloco["verde"]
     email = (RX_EMAIL.search(txt) or [None])[0]
     if not email:
         return None
@@ -225,11 +245,13 @@ def cartao(txt):
         papel = "ASSINAR COMO PARTE"
     else:
         papel = "ASSINAR"
-    assinou = bool(re.search(r"\bASSINOU\b", up)) and not re.search(r"N[ÃA]O\s+ASSINOU", up)
+    assinou = verde or (bool(re.search(r"\bASSINOU\b", up)) and not re.search(r"N[ÃA]O\s+ASSINOU", up))
     datas = [d for d in (ler_data(l) for l in txt.split("\n")) if d]
     nome = ""
     for l in (x.strip() for x in txt.split("\n")):
-        if (len(l) > 2 and "@" not in l and not re.search(r"ASSIN|TESTEMUNHA|PARTE|\d{2}/\d{2}/\d{4}", l.upper())
+        if (len(l) > 2 and "@" not in l
+                and not re.search(r"ASSIN|TESTEMUNHA|PARTE|POSSUI CONTA|AUTENTICA|OPCIONAL|EDITAR|\d{2}/\d{2}/\d{4}",
+                                  l.upper())
                 and not ler_data(l)):
             nome = l
             break
@@ -238,6 +260,27 @@ def cartao(txt):
 
 def interno(email):
     return email.split("@")[-1] in INTERNOS
+
+
+# O nome do documento traz o nome do cliente ("CONTRATO FULANO JAZIGO M-19-450 pdf"), e
+# quando o cliente "Não possui conta" o modal nem mostra o nome dele para tirar. Então o
+# nome sai por LISTA FECHADA: só palavras de tipo de documento, o jazigo e números.
+PALAVRAS_DOC = {"CONTRATO", "JAZIGO", "PERPETUO", "PERPÉTUO", "TEMPORARIO", "TEMPORÁRIO", "RESERVA",
+                "RETOMADA", "PDF", "DE", "DO", "DA", "E", "TERMO", "ADITIVO", "CESSAO", "CESSÃO",
+                "TRANSFERENCIA", "TRANSFERÊNCIA", "QUADRA", "UNIDADE", "PET", "HUMANO", "GAVETA",
+                "DISTRATO", "RENEGOCIACAO", "RENEGOCIAÇÃO", "COMPRA", "VENDA", "PROMESSA"}
+RX_JAZ_DOC = r"M\s*-?\s*\d{1,2}\s*-\s*\d{1,4}[A-Z]?|R-\d{1,4}"
+
+
+def nome_seguro(doc):
+    out = []
+    for tok in re.findall(RX_JAZ_DOC + r"|\S+", doc or "", flags=re.I):
+        limpo = tok.strip(".,;:()[]").upper()
+        if limpo in PALAVRAS_DOC or re.fullmatch(r"[\d/.-]+|" + RX_JAZ_DOC, limpo):
+            out.append(tok)
+        elif not out or out[-1] != "…":
+            out.append("…")
+    return " ".join(out).strip()
 
 
 def tirar_nomes(doc, nomes):
@@ -263,7 +306,7 @@ def montar(d, sigs):
     externos = [s["nome"] for s in (sigs or []) if not interno(s["email"]) and s["nome"]]
     return {
         "uuid": d["uuid"],
-        "documento": tirar_nomes(d["nome"], externos),
+        "documento": nome_seguro(tirar_nomes(d["nome"], externos)),
         "cadastro": d["cadastro"].strftime("%Y-%m-%d %H:%M"),
         "finalizado_em": fin,
         "fase": d["fase"],

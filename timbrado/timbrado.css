@@ -1,0 +1,76 @@
+/* timbrado.css — o papel timbrado do Parque da Saudade (19/09/2026).
+ *
+ * Medido, ponto a ponto, na Tabela de Preços das Retomadas (13/09/2026), que é
+ * a referência visual: A4, margem 34,5 pt, tinta #111, secundário #666, zebra
+ * #F4F3EF, fio #E6E6E6, títulos em PF Marlet Display, texto em Ingra.
+ * As fontes NÃO moram aqui: o gerar.py as lê do docs/index.html do pocket-nps
+ * na hora de montar a página. Tudo em pt, porque o destino é papel.
+ */
+@page { size: A4; margin: 34.5pt 34.5pt 30pt 34.5pt; }
+
+:root {
+  --tinta: #111111;
+  --sec: #666666;
+  --zebra: #F4F3EF;
+  --fio: #E6E6E6;
+  --titulo: "PF Marlet Display", "Playfair Display", Georgia, serif;
+  --texto: "Ingra", "Inter", "Segoe UI", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: var(--tinta);
+  font-family: var(--texto); font-size: 7.5pt; line-height: 1.45;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* ── Cabeçalho: andorinha + marca à esquerda, título do documento à direita ── */
+.cab { display: flex; justify-content: space-between; align-items: flex-start;
+  padding-top: 0; padding-bottom: 10pt; border-bottom: 0.75pt solid var(--tinta); margin-bottom: 6pt; }
+.cab .marca { display: flex; align-items: center; gap: 10pt; }
+.cab .marca img { width: 31pt; height: auto; display: block; }
+.cab .marca .nome { font-family: var(--titulo); font-size: 13.5pt; line-height: 1.1; letter-spacing: .02em; text-transform: uppercase; }
+.cab .marca .sub { font-size: 6pt; letter-spacing: .3em; text-transform: uppercase; margin-top: 5pt; }
+.cab .doc { text-align: right; }
+.cab .doc .titulo { font-family: var(--titulo); font-size: 11.2pt; line-height: 1.1; }
+.cab .doc .sub { font-size: 6pt; letter-spacing: .3em; text-transform: uppercase; margin-top: 6pt; }
+
+/* ── Rótulo de seção: a faixa fina acima de cada tabela ── */
+.rotulo { display: flex; justify-content: space-between; font-size: 6.8pt; letter-spacing: .18em;
+  text-transform: uppercase; margin: 14pt 0 5pt; }
+.rotulo:first-of-type { margin-top: 0; }
+
+/* ── Tabela: cabeçalho preto, linhas de 18 pt com zebra ── */
+table.tab { width: 100%; border-collapse: collapse; margin-bottom: 4pt; page-break-inside: auto; }
+table.tab thead th { background: var(--tinta); color: #fff; font-weight: 400; font-size: 6.4pt;
+  letter-spacing: .15em; text-transform: uppercase; text-align: left; padding: 0 9pt; height: 18pt; }
+table.tab tbody td { height: 18pt; padding: 0 9pt; border-bottom: 0.75pt solid var(--fio); font-size: 7.5pt; }
+table.tab tbody tr:nth-child(odd) td { background: var(--zebra); }
+table.tab tr { page-break-inside: avoid; }
+table.tab .r { text-align: right; font-variant-numeric: tabular-nums; }
+table.tab .forte { font-weight: 700; }
+table.tab .sec { color: var(--sec); font-size: 6.4pt; }
+table.tab tr.total td { background: #fff; border-top: 0.75pt solid var(--tinta); font-weight: 700; }
+
+/* ── Destaques: números grandes em caixas de fio ── */
+.destaques { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; margin: 4pt 0 6pt; }
+.destaques .caixa { border: 0.75pt solid var(--tinta); padding: 9pt 11pt 10pt; }
+.destaques .k { font-size: 6pt; letter-spacing: .18em; text-transform: uppercase; }
+.destaques .v { font-family: var(--titulo); font-size: 20pt; line-height: 1.15; margin-top: 4pt; }
+.destaques .v small { font-family: var(--texto); font-size: 7.5pt; margin-left: 3pt; }
+.destaques .n { font-size: 6.4pt; color: var(--sec); margin-top: 2pt; }
+
+/* ── Texto corrido ── */
+.texto p { margin: 0 0 5pt; }
+.texto ul, .obs ol, .obs ul { margin: 0; padding-left: 12pt; }
+.texto li, .obs li { margin-bottom: 4pt; }
+.lead { font-size: 9pt; line-height: 1.45; margin: 4pt 0 8pt; }
+
+/* ── Observações: a caixa de fio com título em Marlet espaçado ── */
+.obs { border: 0.75pt solid var(--tinta); padding: 11pt 13pt 9pt; margin-top: 14pt; font-size: 6.4pt; page-break-inside: avoid; }
+.obs h3 { font-family: var(--titulo); font-weight: 400; font-size: 7.5pt; letter-spacing: .25em;
+  text-transform: uppercase; margin: 0 0 8pt; }
+
+/* ── Rodapé do documento: fio preto e as duas datas ── */
+.rodape { display: flex; justify-content: space-between; border-top: 0.75pt solid var(--tinta);
+  margin-top: 12pt; padding-top: 5pt; font-size: 6pt; letter-spacing: .18em; text-transform: uppercase; page-break-inside: avoid; }
+
+.quebra { page-break-before: always; }
+.evitar { page-break-inside: avoid; }

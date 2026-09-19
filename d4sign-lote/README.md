@@ -37,3 +37,27 @@ No Claude Code, a rotina inteira é a skill **`/contratos-d4sign AAAA-MM`**
 - Nome final: `M-19-155 - Cliente - 2026-08-12 JAZIGO PERPÉTUO (cb520b4c).zip`. A Reserva não tem jazigo físico e sai como `RESERVA - …`.
 
 Requisitos: `pip install playwright pymupdf` e o Microsoft Edge instalado.
+
+## `status.py` — o status de assinatura no Cofre, sem baixar nada (19/09/2026)
+
+Lê a **tela** do cofre (listagem paginada + o modal de signatários de cada documento) e grava
+na aba `Contratos_D4Sign` do Cofre do Parque pela rota POST `?app=d4sign&fn=gravar`. Nenhum PDF
+é baixado; só abre o modal de signatários, nunca clica em Download, ASSINAR, editar ou TAGs.
+
+```
+python status.py --dry-run            # varre e imprime o payload; NÃO envia
+python status.py                      # varre e envia (reescreve o espelho inteiro)
+python status.py --limite 5 --dry-run # só os 5 mais novos, para teste
+python status.py --so-pendentes       # modal só dos não finalizados (sem e-mail, os finalizados casam só pelo jazigo)
+```
+
+- **Precisa de `token.txt`** na pasta de dados, com o token de gestão do Cofre. Nunca neste repo.
+- Em disco escreve só `status_log.csv` (contagens por fase, nenhum nome ou e-mail).
+- **Roda sozinho** pela tarefa agendada do Windows **"D4Sign - status diario"** (8h; se o PC
+  estava desligado, roda quando ligar). Se a sessão da D4Sign cair, a passada aborta sem
+  tocar no Cofre: entre uma vez na janela do Edge que ela abre.
+- O e-mail do cliente vai para o Cofre só para casar com a venda (vira Deal ID) e não é
+  gravado. O nome do documento sai por lista fechada de palavras, porque ele traz o nome do cliente.
+- O que a tela ensinou (19/09): uma `<tr>` por signatário no modal; "assinou" = ícone
+  `color-verde`; o modal seguinte precisa esperar a animação do anterior fechar; o
+  `wait_for_function` do Playwright não funciona nesta página.

@@ -101,17 +101,35 @@ def levou(fase_txt, cadastro):
 
 # ------------------------------------------------------------------ navegador
 
-def ir(page, url):
-    page.goto(url, wait_until="domcontentloaded")
-    if "login" in page.url:
-        raise Aborta("a página caiu no login no meio da varredura")
-    try:
-        page.wait_for_selector("tbody tr", timeout=30_000)
-    except PWTimeout:
+def ir(page, url, tentativas=1):
+    """True quando a tabela apareceu. `tentativas` > 1 recarrega antes de desistir: em 21/09/2026
+    a passada das 20h abortou com 'ZERO documentos' porque a PRIMEIRA página passou de 30 s —
+    dez minutos depois a mesma leitura rodou inteira. Lentidão passageira não pode derrubar a
+    passada. Nas páginas seguintes fica em 1 tentativa de propósito: ali o tempo esgotado é o
+    fim da paginação, e repetir custaria 30 s em cada passada."""
+    for t in range(max(1, tentativas)):
+        page.goto(url, wait_until="domcontentloaded")
         if "login" in page.url:
             raise Aborta("a página caiu no login no meio da varredura")
-        return False
-    return True
+        try:
+            page.wait_for_selector("tbody tr", timeout=30_000)
+            return True
+        except PWTimeout:
+            if "login" in page.url:
+                raise Aborta("a página caiu no login no meio da varredura")
+            if t + 1 < max(1, tentativas):
+                print("  a tabela não veio em 30 s — recarregando uma vez...", flush=True)
+                time.sleep(3)
+    return False
+
+
+def abrir(p, escondido):
+    """Um contexto por vez no MESMO perfil do Edge (a sessão vive nele)."""
+    ctx = p.chromium.launch_persistent_context(
+        str(PERFIL), channel="msedge", headless=escondido, viewport={"width": 1366, "height": 850})
+    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+    page.set_default_timeout(60_000)
+    return ctx, page
 
 
 def esperar_login(page):
@@ -148,7 +166,7 @@ def varrer(page, cofre, limite):
     for k in range(MAX_PAGINAS):
         p = k - 1
         url = cofre if k == 0 else f"{cofre}?p={p}&f=&fase="
-        if not ir(page, url):
+        if not ir(page, url, tentativas=2 if k == 0 else 1):
             break
         linhas = linhas_da_pagina(page)
         novos = 0
@@ -388,19 +406,39 @@ def main():
     docs = []
     try:
         with sync_playwright() as p:
-            ctx = p.chromium.launch_persistent_context(
-                str(PERFIL), channel="msedge", headless=False, viewport={"width": 1366, "height": 850})
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            page.set_default_timeout(60_000)
+            # A JANELA SÓ APARECE QUANDO PRECISA DE VOCÊ (21/09/2026).
+            # Primeiro tenta ESCONDIDO: com a sessão viva, a passada roda sem janela nenhuma e
+            # não interrompe o dia de ninguém. Se a sessão caiu, ou se a leitura escondida não
+            # trouxe documento, abre a janela e tenta de novo — aí a janela é o sinal de que
+            # alguém precisa logar. O perfil do Edge é o mesmo, e só um contexto por vez.
+            ctx, page = abrir(p, escondido=True)
+            docs, motivo_janela = [], ""
+            try:
+                page.goto(cofre, wait_until="domcontentloaded")
+                if "login" in page.url:
+                    motivo_janela = "a sessão da D4Sign caiu"
+                else:
+                    print("Lendo a listagem do cofre (sem janela)...", flush=True)
+                    docs = varrer(page, cofre, args.limite)
+                    if not docs:
+                        motivo_janela = "a leitura sem janela não achou documento"
+            except Aborta as e:
+                motivo_janela = str(e)
+            except Exception as e:
+                motivo_janela = f"{type(e).__name__} na leitura sem janela"
 
-            # ler
-            page.goto(cofre, wait_until="domcontentloaded")
-            if "login" in page.url:
-                esperar_login(page)
-            print("Lendo a listagem do cofre...", flush=True)
-            docs = varrer(page, cofre, args.limite)
+            if motivo_janela:
+                print(f">>> {motivo_janela}: abrindo a janela do Edge para tentar de novo.", flush=True)
+                ctx.close()
+                ctx, page = abrir(p, escondido=False)
+                page.goto(cofre, wait_until="domcontentloaded")
+                if "login" in page.url:
+                    esperar_login(page)
+                print("Lendo a listagem do cofre...", flush=True)
+                docs = varrer(page, cofre, args.limite)
             if not docs:
-                raise Aborta("a varredura achou ZERO documentos")
+                raise Aborta(f"a varredura achou ZERO documentos ({motivo_janela or 'sem janela'}, "
+                             "e também com a janela aberta)")
 
             print(f"\n{len(docs)} documento(s). Lendo signatários...", flush=True)
             montados = []

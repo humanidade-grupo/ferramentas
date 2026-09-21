@@ -117,11 +117,15 @@ def ir(page, url):
 def esperar_login(page):
     if sys.stdin.isatty():
         input("\n>>> Faça login na janela do navegador e aperte Enter aqui... ")
-    else:
-        print(f">>> Faça login na janela. Sigo quando entrar no cofre (ou existir {SINAL_OK}).", flush=True)
-        fim = time.time() + 15 * 60
-        while time.time() < fim and "/desk/" not in page.url and not SINAL_OK.exists():
-            time.sleep(3)
+        return
+    print(f">>> Faça login na janela. Sigo quando entrar no cofre (ou existir {SINAL_OK}).", flush=True)
+    fim = time.time() + 15 * 60
+    while time.time() < fim and "/desk/" not in page.url and not SINAL_OK.exists():
+        time.sleep(3)
+    # Pela tarefa agendada NÃO há quem digite a senha: sem isto, a espera acabava, o resto
+    # quebrava com um erro que não é Aborta e NADA era registrado (21/09/2026).
+    if "/desk/" not in page.url and not SINAL_OK.exists():
+        raise Aborta("a sessão da D4Sign caiu e ninguém logou na janela em 15 min")
 
 
 def linhas_da_pagina(page):
@@ -424,4 +428,16 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Falha que NÃO é Aborta também vira linha no log. Em 21/09/2026 a tarefa agendada saiu com
+    # erro e o status_log.csv não ganhou linha nenhuma: quem olhasse o log concluiria que ela
+    # nem tinha rodado. Log que só registra a falha prevista mente por omissão.
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as e:
+        try:
+            registrar("erro", [], 0, f"FALHOU: {type(e).__name__}: {str(e).splitlines()[0][:140]}")
+        except Exception:
+            pass
+        raise

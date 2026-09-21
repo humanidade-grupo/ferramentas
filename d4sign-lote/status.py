@@ -336,6 +336,23 @@ def enviar(token, payload):
                                       "rode de novo: o reenvio é idempotente"}
 
 
+def avisar_falha(token, motivo):
+    """Manda o MOTIVO para o Cofre, para a tarja da PonteApp dizer por que o espelho envelheceu.
+    Nunca derruba a execução: se o aviso falhar, o log local continua sendo a fonte."""
+    if not token:
+        return
+    try:
+        req = urllib.request.Request(
+            f"{API}?app=d4sign&fn=falha",
+            data=json.dumps({"token": token, "motivo": motivo}).encode("utf-8"),
+            headers={"Content-Type": "text/plain;charset=utf-8"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            json.loads(r.read().decode("utf-8"))
+        print(">>> motivo avisado ao Cofre (a tela vai dizer por que o espelho está velho).", flush=True)
+    except Exception as e:
+        print(f">>> não consegui avisar o Cofre do motivo ({type(e).__name__}) — fica só no log.", flush=True)
+
+
 def registrar(modo, docs, enviados, resultado):
     novo = not LOG.exists()
     por = {f: sum(1 for d in docs if d["fase"] == f) for f in FASES}
@@ -399,6 +416,8 @@ def main():
             ctx.close()
     except Aborta as e:
         registrar(modo, docs, 0, f"ABORTADO: {e}")
+        if not args.dry_run:
+            avisar_falha(token, str(e))
         sys.exit(f"\nABORTADO, nada enviado: {e}")
 
     # validar (o Cofre valida de novo; aqui é para falhar antes de gastar a rede)
@@ -436,8 +455,14 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except BaseException as e:
+        motivo = f"{type(e).__name__}: {str(e).splitlines()[0][:140]}"
         try:
-            registrar("erro", [], 0, f"FALHOU: {type(e).__name__}: {str(e).splitlines()[0][:140]}")
+            registrar("erro", [], 0, f"FALHOU: {motivo}")
+        except Exception:
+            pass
+        try:   # o Cofre tambem precisa saber: e o que a tarja da PonteApp mostra
+            if _TOKEN_TXT.exists():
+                avisar_falha(_TOKEN_TXT.read_text(encoding="utf-8").strip(), f"a passada quebrou ({motivo})")
         except Exception:
             pass
         raise

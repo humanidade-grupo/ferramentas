@@ -341,17 +341,29 @@ def montar(d, sigs):
     }
 
 
-def enviar(token, payload):
+def enviar(token, payload, tentativas=3):
+    """O /exec do Apps Script falha de vez em quando sem motivo: 404, 500, ou a página HTML
+    "Não foi possível abrir o arquivo" no lugar do JSON (registrado no INFRA). Em 22/09/2026 um
+    404 no primeiro lote jogou no lixo dez minutos de leitura. Agora tenta de novo: o reenvio do
+    MESMO lote é idempotente por construção (o Cofre guarda cada lote sob a chave da passada)."""
     corpo = json.dumps({**payload, "token": token}).encode("utf-8")
-    req = urllib.request.Request(f"{API}?app=d4sign&fn=gravar", data=corpo, method="POST",
-                                 headers={"Content-Type": "text/plain;charset=utf-8"})
-    with urllib.request.urlopen(req, timeout=300) as r:   # o 302 do Apps Script vira GET sozinho
-        txt = r.read().decode("utf-8", "replace")
-    try:
-        return json.loads(txt)
-    except ValueError:
-        return {"ok": False, "error": "resposta não é JSON (a página 'Não foi possível abrir o arquivo'?) — "
-                                      "rode de novo: o reenvio é idempotente"}
+    for t in range(1, tentativas + 1):
+        req = urllib.request.Request(f"{API}?app=d4sign&fn=gravar", data=corpo, method="POST",
+                                     headers={"Content-Type": "text/plain;charset=utf-8"})
+        try:
+            with urllib.request.urlopen(req, timeout=300) as r:   # o 302 do Apps Script vira GET sozinho
+                txt = r.read().decode("utf-8", "replace")
+            return json.loads(txt)
+        except ValueError:
+            erro = "resposta não é JSON (a página 'Não foi possível abrir o arquivo'?)"
+        except Exception as e:
+            erro = f"{type(e).__name__}: {e}"
+        if t < tentativas:
+            print(f"  o Cofre não respondeu direito ({erro}) — tentativa {t + 1} de {tentativas} em 10 s...",
+                  flush=True)
+            time.sleep(10)
+    return {"ok": False, "error": f"o Cofre não respondeu depois de {tentativas} tentativas ({erro}) — "
+                                  "rode de novo: o reenvio é idempotente"}
 
 
 def avisar_falha(token, motivo):
@@ -386,6 +398,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="imprime o payload e não envia")
     ap.add_argument("--limite", type=int, default=0, help="só os N documentos mais novos")
+    ap.add_argument("--escondido", action="store_true",
+                    help="tenta ler sem abrir janela (headless). NAO e o padrao: a tabela da D4Sign "
+                         "as vezes nao renderiza assim — 22/09/2026, medido")
     ap.add_argument("--so-pendentes", action="store_true",
                     help="abre o modal só dos não finalizados (os finalizados vão sem e-mail e casam só pelo jazigo no nome)")
     args = ap.parse_args()
@@ -411,14 +426,19 @@ def main():
             # não interrompe o dia de ninguém. Se a sessão caiu, ou se a leitura escondida não
             # trouxe documento, abre a janela e tenta de novo — aí a janela é o sinal de que
             # alguém precisa logar. O perfil do Edge é o mesmo, e só um contexto por vez.
-            ctx, page = abrir(p, escondido=True)
+            # A JANELA É O PADRÃO (22/09/2026, medido): headless a tabela da D4Sign às vezes
+            # simplesmente não renderiza — a sessão está viva, a página abre, e a listagem vem
+            # com ZERO linhas. Em 21/09 às 20:43 funcionou; no dia seguinte, não. Passada que
+            # falha um dia em cada dois não vale a janela que ela economiza. `--escondido`
+            # segue existindo para quem quiser tentar (e cai para a janela se não achar nada).
+            ctx, page = abrir(p, escondido=args.escondido)
             docs, motivo_janela = [], ""
             try:
                 page.goto(cofre, wait_until="domcontentloaded")
                 if "login" in page.url:
                     motivo_janela = "a sessão da D4Sign caiu"
                 else:
-                    print("Lendo a listagem do cofre (sem janela)...", flush=True)
+                    print("Lendo a listagem do cofre" + (" (sem janela)" if args.escondido else "") + "...", flush=True)
                     docs = varrer(page, cofre, args.limite)
                     if not docs:
                         motivo_janela = "a leitura sem janela não achou documento"
@@ -427,7 +447,7 @@ def main():
             except Exception as e:
                 motivo_janela = f"{type(e).__name__} na leitura sem janela"
 
-            if motivo_janela:
+            if motivo_janela and args.escondido:
                 print(f">>> {motivo_janela}: abrindo a janela do Edge para tentar de novo.", flush=True)
                 ctx.close()
                 ctx, page = abrir(p, escondido=False)
@@ -437,8 +457,8 @@ def main():
                 print("Lendo a listagem do cofre...", flush=True)
                 docs = varrer(page, cofre, args.limite)
             if not docs:
-                raise Aborta(f"a varredura achou ZERO documentos ({motivo_janela or 'sem janela'}, "
-                             "e também com a janela aberta)")
+                raise Aborta("a varredura achou ZERO documentos" +
+                             (f" ({motivo_janela}, e também com a janela aberta)" if motivo_janela else ""))
 
             print(f"\n{len(docs)} documento(s). Lendo signatários...", flush=True)
             montados = []

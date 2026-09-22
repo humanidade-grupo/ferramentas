@@ -53,9 +53,25 @@ python status.py --so-pendentes       # modal só dos não finalizados (sem e-ma
 
 - **Precisa de `token.txt`** na pasta de dados, com o token de gestão do Cofre. Nunca neste repo.
 - Em disco escreve só `status_log.csv` (contagens por fase, nenhum nome ou e-mail).
-- **Roda sozinho** pela tarefa agendada do Windows **"D4Sign - status diario"** (8h; se o PC
-  estava desligado, roda quando ligar). Se a sessão da D4Sign cair, a passada aborta sem
-  tocar no Cofre: entre uma vez na janela do Edge que ela abre.
+- 🖱️ **`atualizar-d4sign.cmd` é a passada MANUAL** — atalho **"Atualizar D4Sign"** na área de
+  trabalho do Ricardo. Abre a janela, espera o login se precisar, mostra o resultado e fica
+  aberto no fim. É o caminho que funciona quando a sessão caiu, porque tem gente na frente.
+  ⚠️ **Editar esse .cmd só em ASCII e CRLF**: com LF o `cmd.exe` come o primeiro caractere de
+  cada linha (custou uma execução torta em 22/09/2026).
+- **Roda sozinho** pela tarefa agendada do Windows **"D4Sign - status diario"** — **8h, 14h e
+  20h** desde 21/09 (se o PC estava desligado, roda quando ligar; duas execuções nunca se
+  atropelam). **Se a sessão da D4Sign cair, a passada agendada aborta em segundos** (22/09):
+  esperar login que ninguém vai digitar só deixa uma janela aberta na frente de quem trabalha.
+  O motivo vai para o Cofre (`?app=d4sign&fn=falha`), a tarja da PonteApp passa a dizer
+  "a sessão da D4Sign caiu", e sai **e-mail** (destinatário em `sync.email` da Config, no
+  máximo um a cada 6 h por motivo). O conserto é clicar no atalho e logar.
+- 🔁 **O que é passageiro tem retry, porque a leitura custa ~10 min:** a 1ª página recarrega uma
+  vez se a tabela não vier em 30 s; o envio de cada lote tenta 3× (o `/exec` devolveu **404** em
+  22/09) e também quando o Cofre responde "outra escrita em andamento" (a importação do Facilita
+  segurando a trava — foi o lote 6/6 recusado em 22/09). Reenviar o mesmo lote é idempotente.
+- 🙈 **`--escondido` (headless) NÃO é o padrão:** medido em 22/09, a tabela da D4Sign às vezes
+  não renderiza sem janela — sessão viva, página abre, ZERO linhas. Em 21/09 às 20:43 funcionou;
+  no dia seguinte, não.
 - O e-mail do cliente vai para o Cofre só para casar com a venda (vira Deal ID) e não é
   gravado. O nome do documento sai por lista fechada de palavras, porque ele traz o nome do cliente.
 - O que a tela ensinou (19/09): uma `<tr>` por signatário no modal; "assinou" = ícone

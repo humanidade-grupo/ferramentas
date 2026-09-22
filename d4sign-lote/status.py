@@ -358,7 +358,19 @@ def enviar(token, payload, tentativas=3):
         try:
             with urllib.request.urlopen(req, timeout=300) as r:   # o 302 do Apps Script vira GET sozinho
                 txt = r.read().decode("utf-8", "replace")
-            return json.loads(txt)
+            r = json.loads(txt)
+            # A TRAVA DO COFRE TAMBÉM É PASSAGEIRA (22/09/2026): o lote 6/6 foi recusado com
+            # "outra escrita em andamento" porque a importação do Facilita estava gravando —
+            # dez minutos de leitura perdidos por 20 s de trava. Isto é para tentar de novo.
+            if r.get("ok") is False and "outra escrita em andamento" in str(r.get("error", "")):
+                erro = str(r.get("error"))
+                if t < tentativas:
+                    print(f"  o Cofre está gravando outra coisa — tentativa {t + 1} de {tentativas} em 10 s...",
+                          flush=True)
+                    time.sleep(10)
+                    continue
+                return r
+            return r
         except ValueError:
             erro = "resposta não é JSON (a página 'Não foi possível abrir o arquivo'?)"
         except Exception as e:

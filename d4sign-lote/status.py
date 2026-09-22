@@ -136,14 +136,19 @@ def esperar_login(page):
     if sys.stdin.isatty():
         input("\n>>> Faça login na janela do navegador e aperte Enter aqui... ")
         return
-    print(f">>> Faça login na janela. Sigo quando entrar no cofre (ou existir {SINAL_OK}).", flush=True)
-    fim = time.time() + 15 * 60
+    # SEM ESPERA NA EXECUÇÃO AGENDADA (22/09/2026, decisão do Ricardo: "se depende de eu logar e
+    # eu não vejo a janela, não vai funcionar"). Esperar 15 min por um login que ninguém vai
+    # fazer só deixa uma janela do Edge aberta na frente dele. Aborta em segundos, o Cofre manda
+    # e-mail com o motivo, e o conserto é UM CLIQUE: o atalho "Atualizar D4Sign" na área de
+    # trabalho, que roda com console e aí sim espera o login (o ramo isatty, acima).
+    # O arquivo `ok` segue valendo como escape: quem quiser logar e deixar seguir, cria o arquivo.
+    print(">>> a sessão da D4Sign caiu. Nada a fazer sem login: abortando.", flush=True)
+    fim = time.time() + 20
     while time.time() < fim and "/desk/" not in page.url and not SINAL_OK.exists():
-        time.sleep(3)
-    # Pela tarefa agendada NÃO há quem digite a senha: sem isto, a espera acabava, o resto
-    # quebrava com um erro que não é Aborta e NADA era registrado (21/09/2026).
+        time.sleep(2)
     if "/desk/" not in page.url and not SINAL_OK.exists():
-        raise Aborta("a sessão da D4Sign caiu e ninguém logou na janela em 15 min")
+        raise Aborta("a sessão da D4Sign caiu — rode o atalho \"Atualizar D4Sign\" na área de "
+                     "trabalho e faça o login na janela do Edge")
 
 
 def linhas_da_pagina(page):

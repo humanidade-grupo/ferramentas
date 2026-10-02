@@ -119,6 +119,8 @@ def preparar_repo():
 
 def regrediu(nome, atual, copia):
     """Devolve o motivo do alarme, ou None."""
+    if nome == CAIXA:
+        return None   # a caixa esvazia por desenho a cada junção: encolher é o normal dela
     if atual is None:
         return "o arquivo sumiu do Drive" if copia is not None else None
     if copia is None:

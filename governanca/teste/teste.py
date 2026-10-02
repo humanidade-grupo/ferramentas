@@ -52,6 +52,9 @@ caso('junta a linha no topo da tabela', '|---|---|\n| **01/10, 22h (Cowork, test
 caso('cabeçalho novo; o antigo desce para Anterior',
      '> Última atualização: **01/10/2026, 22h (Cowork, teste)** — entrou\n>\n> Anterior: **01/10/2026, noite' in d)
 caso('a caixa volta vazia', 'entrou pela caixa' not in r_(CX))
+caso('esvaziar a caixa não toca alarme (falso alarme de 02/10)', r.returncode == 0 and 'regrediu' not in r.stdout)
+r2 = run()
+caso('e a rodada seguinte segue limpa', r2.returncode == 0 and 'regrediu' not in r2.stdout)
 caso('a quebra de linha continua LF', '\r' not in d and '\r' not in r_(CX))
 
 w(CX, r_(CX) + ENTRADA)

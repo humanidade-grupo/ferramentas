@@ -36,7 +36,7 @@ import shutil
 import subprocess
 import sys
 
-RAIZ = pathlib.Path(os.environ.get("GOV_RAIZ", "G:/Meu Drive/Grupo Humanidade"))
+RAIZ = pathlib.Path(os.environ.get("GOV_RAIZ", "C:/Users/ricar/Meu Drive/Grupo Humanidade"))
 COPIAS = pathlib.Path(os.environ.get("GOV_COPIAS", "C:/Users/ricar/Documents/GitHub/governanca-copias"))
 DIARIO = "ESTADO ATUAL — Diario de Bordo.md"
 CAIXA = "Diário — caixa de entrada do Cowork.md"

@@ -74,3 +74,28 @@ table.tab tr.total td { background: #fff; border-top: 0.75pt solid var(--tinta);
 
 .quebra { page-break-before: always; }
 .evitar { page-break-inside: avoid; }
+
+/* ── Extratos de comissão (05/10/2026): componentes novos ── */
+/* tabela densa: 9 a 10 colunas em A4 retrato */
+table.tab.densa thead th, table.tab.densa tbody td { padding-left: 5pt; padding-right: 5pt; }
+table.tab.densa thead th { letter-spacing: .1em; line-height: 1.25; padding-top: 3pt; padding-bottom: 3pt; }
+table.tab thead th.r { text-align: right; }
+table.tab .nw { white-space: nowrap; }
+table.tab td.solto { padding-top: 4pt; padding-bottom: 4pt; line-height: 1.35; }
+/* a linha de total não pode perder para a zebra quando cai em linha ímpar */
+table.tab tbody tr.total td { background: #fff; }
+/* o rótulo não se separa da tabela que ele anuncia */
+.rotulo { page-break-after: avoid; }
+/* rótulo dentro de um bloco .evitar mantém o respiro de cima */
+.evitar > .rotulo:first-of-type { margin-top: 14pt; }
+/* colunas travadas: as tabelas de todos os vendedores alinham entre si */
+table.tab.fixa { table-layout: fixed; }
+/* tabela em destaque: cabeçalho no dourado da marca, zebra e total em bege */
+table.tab.ouro thead th { background: #CC900B; color: var(--tinta); font-weight: 700; }
+table.tab.ouro tbody tr:nth-child(odd) td { background: #FAF1DC; }
+table.tab.ouro tbody td { border-bottom-color: #ECC685; }
+table.tab.ouro tbody tr.total td { background: #ECC685; border-top: 0.75pt solid var(--tinta); border-bottom: 0; }
+/* linha de conferência / assinatura */
+.assina { display: flex; gap: 24pt; margin-top: 26pt; page-break-inside: avoid; }
+.assina div { flex: 1; border-top: 0.75pt solid var(--tinta); padding-top: 4pt; font-size: 6pt;
+  letter-spacing: .18em; text-transform: uppercase; }

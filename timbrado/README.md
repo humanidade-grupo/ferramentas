@@ -15,6 +15,19 @@ a das Retomadas de 13/09/2026). As medidas do `timbrado.css` foram tiradas dela,
 - **Observações:** caixa de fio com título em PF Marlet espaçado e lista numerada
 - **Rodapé:** fio preto e duas datas em caixa alta espaçada
 
+### Componentes acrescentados para os extratos de comissão (05/10/2026)
+
+- `table.tab.densa` — 9 a 10 colunas em A4 retrato (respiro lateral de 5 pt, cabeçalho em duas linhas)
+- `table.tab.fixa` — `table-layout: fixed`: as tabelas de vários blocos alinham coluna com coluna (larguras no `<colgroup>`)
+- `table.tab.ouro` — a tabela **em destaque**: cabeçalho no dourado da marca `#CC900B`, zebra `#FAF1DC`, total em bege `#ECC685`.
+  Uma por documento, no máximo; as demais seguem pretas
+- `.nw` (não quebra) · `th.r` (cabeçalho à direita) · `td.solto` (célula de texto longo, com respiro)
+- `.assina` — linhas de conferência/assinatura (`<div class="assina"><div>Conferido por …</div><div>Data</div></div>`)
+- Consertos: o `tr.total` agora vence a zebra quando cai em linha ímpar; o `.rotulo` não se separa da tabela que anuncia
+
+Quem usa: a Retrospectiva do Painel Comercial (`painel-comercial/docs/retrospectiva/`), que **lê este arquivo
+na hora de emitir** — mudar uma medida aqui muda os extratos na próxima emissão, sem tocar o Painel.
+
 ## Como gerar
 
 ```bash

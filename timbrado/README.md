@@ -24,6 +24,9 @@ a das Retomadas de 13/09/2026). As medidas do `timbrado.css` foram tiradas dela,
 - `.nw` (não quebra) · `th.r` (cabeçalho à direita) · `td.solto` (célula de texto longo, com respiro)
 - `.assina` — linhas de conferência/assinatura (`<div class="assina"><div>Conferido por …</div><div>Data</div></div>`)
 - Consertos: o `tr.total` agora vence a zebra quando cai em linha ímpar; o `.rotulo` não se separa da tabela que anuncia
+- `.quadro` (07/10/2026) — bloco **destinado a um setor** (ex.: RH/Financeiro no extrato geral): moldura de 1,5 pt e
+  faixa preta com o destinatário. `<div class="quadro"><div class="faixa"><b>Para o RH / Financeiro</b><span>…</span></div>
+  <div class="dentro">… .destaques · table.tab · p.nota …</div></div>`. Não se separa entre páginas
 
 Quem usa: a Retrospectiva do Painel Comercial (`painel-comercial/docs/retrospectiva/`), que **lê este arquivo
 na hora de emitir** — mudar uma medida aqui muda os extratos na próxima emissão, sem tocar o Painel.

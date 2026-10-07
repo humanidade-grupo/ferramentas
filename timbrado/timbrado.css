@@ -99,3 +99,13 @@ table.tab.ouro tbody tr.total td { background: #ECC685; border-top: 0.75pt solid
 .assina { display: flex; gap: 24pt; margin-top: 26pt; page-break-inside: avoid; }
 .assina div { flex: 1; border-top: 0.75pt solid var(--tinta); padding-top: 4pt; font-size: 6pt;
   letter-spacing: .18em; text-transform: uppercase; }
+/* ── Quadro destinado a um setor (07/10/2026): moldura grossa e faixa preta com o destinatário ── */
+.quadro { border: 1.5pt solid var(--tinta); margin-top: 14pt; page-break-inside: avoid; }
+.quadro > .faixa { display: flex; justify-content: space-between; align-items: baseline; background: var(--tinta); color: #fff;
+  padding: 6pt 11pt; font-size: 6.8pt; letter-spacing: .18em; text-transform: uppercase; }
+.quadro > .faixa b { font-family: var(--titulo); font-weight: 400; font-size: 9pt; letter-spacing: .2em; }
+.quadro > .dentro { padding: 10pt 11pt 9pt; }
+.quadro .destaques { margin-top: 0; }
+.quadro table.tab { margin-bottom: 0; }
+.quadro .nota { font-size: 6.4pt; line-height: 1.45; color: var(--sec); margin: 6pt 0 0; }
+.quadro .nota strong { color: var(--tinta); }

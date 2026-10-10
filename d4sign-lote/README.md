@@ -2,8 +2,8 @@
 
 > 🔑 **10/10/2026: a D4Sign passou a ter API.** O `status.py` está **APOSENTADO** — a passada do status de
 > assinatura roda no Cofre, de hora em hora, pela API (`cofre/D4SignAPI.gs`, rota `?app=d4sign&fn=api`), e a
-> tarefa do Windows "D4Sign - status diario" foi **desabilitada**. O `baixar.py`/`renomear.py` seguem pela tela
-> (a API também baixa documento — trocar é tarefa à parte, ainda não feita).
+> tarefa do Windows "D4Sign - status diario" foi **desabilitada**. O `baixar.py` também passou para a API
+> no mesmo dia (sem Edge e sem login; chave em `chave_api.txt` na pasta de dados, nunca no repo). O `renomear.py` segue igual.
 
 Até 09/10 a conta da D4Sign era gratuita: **sem API e sem download em lote pela tela.** Estes dois scripts baixam os
 contratos **FINALIZADOS** de um mês e renomeiam cada `.zip` com o jazigo e o cliente.

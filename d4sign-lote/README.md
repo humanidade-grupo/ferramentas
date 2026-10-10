@@ -1,6 +1,11 @@
 # d4sign-lote — contratos da D4Sign, uma vez por mês
 
-A conta da D4Sign é gratuita: **sem API e sem download em lote pela tela.** Estes dois scripts baixam os
+> 🔑 **10/10/2026: a D4Sign passou a ter API.** O `status.py` está **APOSENTADO** — a passada do status de
+> assinatura roda no Cofre, de hora em hora, pela API (`cofre/D4SignAPI.gs`, rota `?app=d4sign&fn=api`), e a
+> tarefa do Windows "D4Sign - status diario" foi **desabilitada**. O `baixar.py`/`renomear.py` seguem pela tela
+> (a API também baixa documento — trocar é tarefa à parte, ainda não feita).
+
+Até 09/10 a conta da D4Sign era gratuita: **sem API e sem download em lote pela tela.** Estes dois scripts baixam os
 contratos **FINALIZADOS** de um mês e renomeiam cada `.zip` com o jazigo e o cliente.
 
 Diferente das outras ferramentas deste repo, **não é página publicada**: roda na máquina do Ricardo
@@ -38,7 +43,11 @@ No Claude Code, a rotina inteira é a skill **`/contratos-d4sign AAAA-MM`**
 
 Requisitos: `pip install playwright pymupdf` e o Microsoft Edge instalado.
 
-## `status.py` — o status de assinatura no Cofre, sem baixar nada (19/09/2026)
+## `status.py` — ⛔ APOSENTADO em 10/10/2026 (substituído pela API, `cofre/D4SignAPI.gs`)
+
+*Registro do que era — não rodar: ele reescreveria o espelho que a API mantém.*
+
+### o status de assinatura no Cofre, sem baixar nada (19/09/2026)
 
 Lê a **tela** do cofre (listagem paginada + o modal de signatários de cada documento) e grava
 na aba `Contratos_D4Sign` do Cofre do Parque pela rota POST `?app=d4sign&fn=gravar`. Nenhum PDF

@@ -1,4 +1,7 @@
-"""Espelha no Cofre do Parque o STATUS DE ASSINATURA dos contratos da D4Sign (uso local).
+"""⛔ APOSENTADO EM 10/10/2026 — a passada roda no Cofre pela API da D4Sign (cofre/D4SignAPI.gs,
+de hora em hora). A tarefa do Windows "D4Sign - status diario" foi desabilitada. Não rodar.
+
+Espelha no Cofre do Parque o STATUS DE ASSINATURA dos contratos da D4Sign (uso local).
 
 SÓ LEITURA na D4Sign: nada é baixado, nada é clicado além de abrir o modal de
 signatários. Nunca clica em "Download (original e assinaturas)", "ASSINAR",
@@ -37,7 +40,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+from playwright.sync_api import sync_playwright, Error as PWError, TimeoutError as PWTimeout
 
 BASE = Path(os.environ.get("D4SIGN_DADOS", Path.home() / "Documents" / "d4sign-lote"))
 PERFIL = BASE / "perfil"
@@ -62,6 +65,10 @@ RX_PCT = re.compile(r"(\d+)\s*%\s*\(\s*(\d+)\s+de\s+(\d+)\s*\)", re.I)
 
 class Aborta(Exception):
     """Qualquer coisa que torna a passada não confiável. Nada é enviado."""
+
+
+class Navegou(Exception):
+    """A página trocou de endereço (ou recarregou) no meio de uma leitura. Dá para retomar."""
 
 
 # ------------------------------------------------------------------ datas
@@ -230,20 +237,71 @@ FECHAR_MODAL = r"""() => {
 }"""
 
 
-def ler_signatarios(page, uuid):
-    """Abre o modal de signatários (o mesmo javascript da tela) e lê o .modal-body."""
+def avaliar(page, js):
+    """page.evaluate que avisa quando a página navegou embaixo dele, em vez de quebrar a passada.
+    Em 05/10/2026 a passada manual morreu no documento ~65 de 184 com "Execution context was
+    destroyed, most likely because of a navigation": a página saiu do cofre sozinha no meio da
+    espera do modal (sessão que cai, ou a D4Sign recarregando a tela) e o evaluate estourou
+    como erro cru, antes de chegar no `if "login" in page.url` logo abaixo."""
+    try:
+        return page.evaluate(js)
+    except PWTimeout:
+        raise
+    except PWError as e:
+        txt = str(e)
+        if any(m in txt.lower() for m in ("context was destroyed", "navigation",
+                                          "cannot find context", "frame was detached")):
+            raise Navegou(txt.splitlines()[0][:140])
+        raise
+
+
+def retomar(page, cofre):
+    """Depois de um Navegou: espera a página assentar, pede login se foi isso, e volta à
+    listagem do cofre (é nela que existe o eModalO que abre o modal)."""
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=30_000)
+    except PWError:
+        pass
+    time.sleep(1)
+    if "login" in page.url:
+        print("\n>>> a sessão da D4Sign caiu no meio da leitura dos signatários.", flush=True)
+        esperar_login(page)          # com console espera o Enter; agendada aborta em segundos
+    if not cofre:
+        raise Aborta("a página navegou sozinha no meio da leitura dos signatários")
+    if not ir(page, cofre, tentativas=2):
+        raise Aborta("a página navegou sozinha no meio da leitura e a listagem do cofre não voltou")
+
+
+def ler_signatarios(page, uuid, cofre=None):
+    """Abre o modal de signatários (o mesmo javascript da tela) e lê o .modal-body.
+    Se a página navegar no meio (ver `avaliar`), volta ao cofre e relê ESTE documento; duas
+    navegações no mesmo documento abortam — aí não é soluço, é a tela que não para quieta."""
+    navegou = 0
+    while True:
+        try:
+            return _ler_signatarios(page, uuid)
+        except Navegou as e:
+            navegou += 1
+            if navegou > 2:
+                raise Aborta(f"a página navegou sozinha 3 vezes lendo os signatários de {uuid} ({e})")
+            print(f"  a página navegou sozinha no meio da leitura — voltando ao cofre e relendo ({navegou}/2)...",
+                  flush=True)
+            retomar(page, cofre)
+
+
+def _ler_signatarios(page, uuid):
     for tentativa in range(3):
-        page.evaluate(FECHAR_MODAL)
+        avaliar(page, FECHAR_MODAL)
         # O fechamento do anterior é animado (bootstrap "fade"): abrir o próximo antes de ele
         # terminar deixa o modal novo escondido, e o e-mail nunca fica visível (medido em 19/09).
         time.sleep(1.2)
-        page.evaluate(f"eModalO('/desk/listsignatarios/{uuid}','S','fa-users','lg')")
+        avaliar(page, f"eModalO('/desk/listsignatarios/{uuid}','S','fa-users','lg')")
         # Espera em Python, não com wait_for_function: nesta página ele estoura o prazo
         # mesmo com o modal pronto em ~1 s (medido em 19/09 — provavelmente a CSP da D4Sign).
         pronto = False
         for _ in range(40):
             time.sleep(0.5)
-            if page.evaluate(r"""() => [...document.querySelectorAll('.modal-body')].some(b => /@/.test(b.innerText || ''))"""):
+            if avaliar(page, r"""() => [...document.querySelectorAll('.modal-body')].some(b => /@/.test(b.innerText || ''))"""):
                 pronto = True
                 break
         if not pronto:
@@ -251,8 +309,8 @@ def ler_signatarios(page, uuid):
                 raise Aborta("a sessão caiu no meio da leitura dos signatários")
             continue
         time.sleep(0.5)   # a tabela termina de montar logo depois do primeiro e-mail
-        cartoes = page.evaluate(LER_MODAL) or []
-        page.evaluate(FECHAR_MODAL)
+        cartoes = avaliar(page, LER_MODAL) or []
+        avaliar(page, FECHAR_MODAL)
         sigs = [cartao(c) for c in cartoes]
         sigs = [s for s in sigs if s]
         if sigs:
@@ -482,7 +540,7 @@ def main():
             for i, d in enumerate(docs, 1):
                 # sem signatário cadastrado (Editando / Aguardando Signatários) o modal não tem e-mail
                 precisa = d["total"] > 0 and (not args.so_pendentes or d["fase"] != "FINALIZADO")
-                sigs = ler_signatarios(page, d["uuid"]) if precisa else None
+                sigs = ler_signatarios(page, d["uuid"], cofre) if precisa else None
                 if precisa and d["total"] and len(sigs) < d["total"]:
                     raise Aborta(f"{d['uuid']}: o modal trouxe {len(sigs)} signatário(s) e a tabela diz {d['total']}")
                 montados.append(montar(d, sigs))

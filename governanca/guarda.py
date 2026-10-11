@@ -180,6 +180,10 @@ def juntar_caixa():
     if not entradas:
         return 0
     diario = ler(diario_p)
+    # 10/10: uma gravação devolveu o Diário inteiro em CRLF e a âncora (LF) sumiu — a caixa parou.
+    # O Diário mora com LF: volta para LF aqui, e a gravação abaixo o deixa assim.
+    if diario and "\r\n" in diario:
+        diario = diario.replace("\r\n", "\n")
     assert diario and ANCORA_TABELA in diario, "Diário sem a tabela da Linha do tempo — nada feito"
     novas = [(c, l) for c, l in entradas if l not in diario]
     if novas:
